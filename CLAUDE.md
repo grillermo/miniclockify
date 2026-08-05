@@ -94,3 +94,4 @@ capturing.
 ## Development
 
 After EVERY successful change run ./build
+And on successful build do a commit with a description of the changes

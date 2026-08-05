@@ -77,6 +77,7 @@ struct QuickEntryView: View {
                 DatePicker("", selection: $startTime, in: ...Date(),
                            displayedComponents: .hourAndMinute)
                     .labelsHidden().disabled(starting)
+                    .onKeyPress(.return) { start(); return .handled }
             }
             if let err = tracking.lastError {
                 Text(err).font(.caption).foregroundStyle(.red)   // inline retry surface
