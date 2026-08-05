@@ -17,7 +17,7 @@ final class QuickEntryPanel {
         let view = QuickEntryView(
             tracking: tracking, api: api, project: project,
             onDone: { [weak self] in self?.close() })
-        present(NSHostingController(rootView: view), height: 150)
+        present(NSHostingController(rootView: view), height: 290)
     }
 
     /// Hotkey-while-running confirmation: same floating panel, Enter stops & logs.
@@ -84,7 +84,7 @@ struct QuickEntryView: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(matches.prefix(6).enumerated()), id: \.offset) { i, d in
+                    ForEach(Array(matches.prefix(5).enumerated()), id: \.offset) { i, d in
                         Text(d)
                             .padding(.horizontal, 6).padding(.vertical, 3)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -92,7 +92,7 @@ struct QuickEntryView: View {
                             .onTapGesture { text = d; start() }
                     }
                 }
-            }.frame(maxHeight: 90)
+            }.frame(maxHeight: 230)
         }
         .padding(16)
         .task {
@@ -111,7 +111,7 @@ struct QuickEntryView: View {
     }
 
     private func move(_ d: Int) {
-        let n = min(matches.count, 6)
+        let n = min(matches.count, 5)
         guard n > 0 else { return }
         highlighted = (highlighted + d + n) % n
     }
