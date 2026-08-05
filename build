@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP="MiniClockify.app"
+
+pkill -x MiniClockify 2>/dev/null || true
+
+"$(dirname "$0")/build-app.sh" "$@"
+
+open "$APP"

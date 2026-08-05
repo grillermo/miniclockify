@@ -1,0 +1,5 @@
+.build/
+*.xcodeproj
+MiniClockify.app/
+.DS_Store
+.env
