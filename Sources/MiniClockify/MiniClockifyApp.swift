@@ -119,7 +119,7 @@ final class AppState: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     private func updateElapsed() {
-        guard case .running(_, let start, _, _)? = tracking?.state else { elapsed = "00:00:00"; return }
+        guard case .running(_, let start, _, _)? = tracking?.state else { elapsed = "..."; return }
         let t = Int(Date().timeIntervalSince(start))
         elapsed = String(format: "%02d:%02d:%02d", t/3600, (t%3600)/60, t%60)
     }

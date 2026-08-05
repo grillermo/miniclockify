@@ -120,9 +120,8 @@ struct QuickEntryView: View {
         guard !starting else { return }
         let chosen: String
         let m = matches
-        if !m.isEmpty && text.isEmpty == false
-            && m.indices.contains(highlighted)
-            && m[highlighted].localizedCaseInsensitiveContains(text) {
+        if m.indices.contains(highlighted)
+            && (text.isEmpty || m[highlighted].localizedCaseInsensitiveContains(text)) {
             chosen = m[highlighted]
         } else {
             chosen = text.trimmingCharacters(in: .whitespaces)
