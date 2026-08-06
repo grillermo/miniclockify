@@ -17,6 +17,19 @@ enum RecentDescriptions {
         return result.filter { $0.range(of: query, options: .caseInsensitive) != nil }
     }
 
+    /// First deduped description that begins with `query` (case-insensitive) and
+    /// is strictly longer, i.e. has a non-empty completion to offer. Returns nil
+    /// when nothing to autocomplete (empty query, no prefix match, or exact hit).
+    static func firstPrefixMatch(descriptions: [String], query: String) -> String? {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return nil }
+        let lower = q.lowercased()
+        return filter(descriptions: descriptions, query: "").first {
+            let dl = $0.lowercased()
+            return dl.hasPrefix(lower) && dl != lower
+        }
+    }
+
     /// Fetch recent entry descriptions, most-recent-first, via the API.
     static func fetch(api: ClockifyAPI, workspaceId: String, userId: String) async -> [String] {
         let entries = (try? await api.recentTimeEntries(workspaceId: workspaceId, userId: userId)) ?? []

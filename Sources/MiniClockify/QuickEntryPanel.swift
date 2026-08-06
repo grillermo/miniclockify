@@ -57,10 +57,20 @@ struct QuickEntryView: View {
     @State private var all: [String] = []
     @State private var highlighted = 0
     @State private var starting = false
+    /// Set to the value we just Tab-completed to; suppresses the ghost suggestion
+    /// so Tab reverts to normal focus-advance until the user types again.
+    @State private var accepted: String?
     @FocusState private var focused: Bool
 
     private var matches: [String] {
         RecentDescriptions.filter(descriptions: all, query: text)
+    }
+
+    /// Inline autocomplete candidate (dimmed ghost tail), or nil when nothing to
+    /// complete or the current text was just accepted via Tab.
+    private var suggestion: String? {
+        guard accepted != text else { return nil }
+        return RecentDescriptions.firstPrefixMatch(descriptions: all, query: text)
     }
 
     var body: some View {
@@ -68,8 +78,26 @@ struct QuickEntryView: View {
             TextField("What are you working on?", text: $text)
                 .textFieldStyle(.plain).font(.title3).focused($focused)
                 .disabled(starting)
+                // Dimmed ghost tail of the autocomplete candidate, laid out as if
+                // the whole suggestion were typed so the tail lands after the cursor.
+                .overlay(alignment: .leading) {
+                    if let s = suggestion {
+                        (Text(String(s.prefix(text.count))).foregroundStyle(.clear)
+                            + Text(s.dropFirst(text.count)).foregroundStyle(.tertiary))
+                            .font(.title3)
+                            .allowsHitTesting(false)
+                    }
+                }
                 .onSubmit { start() }
                 .onChange(of: text) { _, _ in highlighted = 0 }  // reset on filter change
+                // Tab accepts the ghost suggestion in place; with none, fall through
+                // (.ignored) so focus advances to the DatePicker as usual.
+                .onKeyPress(.tab) {
+                    guard let s = suggestion else { return .ignored }
+                    text = s
+                    accepted = s
+                    return .handled
+                }
             HStack {
                 Text(project.map { "→ \($0.name)" } ?? "→ No project yet")
                     .font(.caption).foregroundStyle(.secondary)

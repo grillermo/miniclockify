@@ -30,4 +30,25 @@ final class RecentDescriptionsTests: XCTestCase {
         XCTAssertEqual(RecentDescriptions.filter(descriptions: input, query: ""),
                        ["fix bug", "deploy"])
     }
+
+    func testPrefixMatchReturnsFirstLongerMatchCaseInsensitive() {
+        let input = ["Clockify design", "deploy", "clockify build"]
+        XCTAssertEqual(RecentDescriptions.firstPrefixMatch(descriptions: input, query: "clo"),
+                       "Clockify design")
+    }
+
+    func testPrefixMatchNilOnEmptyOrNoMatch() {
+        let input = ["deploy", "write docs"]
+        XCTAssertNil(RecentDescriptions.firstPrefixMatch(descriptions: input, query: ""))
+        XCTAssertNil(RecentDescriptions.firstPrefixMatch(descriptions: input, query: "xyz"))
+    }
+
+    func testPrefixMatchNilOnExactHit() {
+        let input = ["deploy", "deployment"]
+        // "deploy" matches "deploy" exactly (nothing to complete) but "deployment"
+        // is longer, so it is offered instead.
+        XCTAssertEqual(RecentDescriptions.firstPrefixMatch(descriptions: input, query: "deploy"),
+                       "deployment")
+        XCTAssertNil(RecentDescriptions.firstPrefixMatch(descriptions: ["deploy"], query: "deploy"))
+    }
 }
