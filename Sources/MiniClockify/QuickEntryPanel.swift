@@ -70,7 +70,7 @@ struct QuickEntryView: View {
     /// complete or the current text was just accepted via Tab.
     private var suggestion: String? {
         guard accepted != text else { return nil }
-        return RecentDescriptions.firstPrefixMatch(descriptions: all, query: text)
+        return RecentDescriptions.firstAutocomplete(descriptions: all, query: text)
     }
 
     var body: some View {
@@ -78,12 +78,13 @@ struct QuickEntryView: View {
             TextField("What are you working on?", text: $text)
                 .textFieldStyle(.plain).font(.title3).focused($focused)
                 .disabled(starting)
-                // Dimmed ghost tail of the autocomplete candidate, laid out as if
-                // the whole suggestion were typed so the tail lands after the cursor.
+                // Dimmed ghost of the autocomplete candidate. For a prefix match
+                // the remaining tail is laid out just past the cursor; for a
+                // mid-word (substring) match the whole suggestion is shown as a
+                // "→ …" hint after the typed text, since it can't align inline.
                 .overlay(alignment: .leading) {
                     if let s = suggestion {
-                        (Text(String(s.prefix(text.count))).foregroundStyle(.clear)
-                            + Text(s.dropFirst(text.count)).foregroundStyle(.tertiary))
+                        ghost(for: s)
                             .font(.title3)
                             .allowsHitTesting(false)
                     }
@@ -137,6 +138,15 @@ struct QuickEntryView: View {
             onDone()
             return .handled
         }
+    }
+
+    private func ghost(for s: String) -> Text {
+        if s.lowercased().hasPrefix(text.lowercased()) {
+            return Text(String(s.prefix(text.count))).foregroundStyle(.clear)
+                + Text(s.dropFirst(text.count)).foregroundStyle(.tertiary)
+        }
+        return Text(text).foregroundStyle(.clear)
+            + Text("  → \(s)").foregroundStyle(.tertiary)
     }
 
     private func move(_ d: Int) {

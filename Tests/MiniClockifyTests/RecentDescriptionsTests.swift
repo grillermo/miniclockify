@@ -31,24 +31,33 @@ final class RecentDescriptionsTests: XCTestCase {
                        ["fix bug", "deploy"])
     }
 
-    func testPrefixMatchReturnsFirstLongerMatchCaseInsensitive() {
+    func testAutocompleteReturnsFirstLongerMatchCaseInsensitive() {
         let input = ["Clockify design", "deploy", "clockify build"]
-        XCTAssertEqual(RecentDescriptions.firstPrefixMatch(descriptions: input, query: "clo"),
+        XCTAssertEqual(RecentDescriptions.firstAutocomplete(descriptions: input, query: "clo"),
                        "Clockify design")
     }
 
-    func testPrefixMatchNilOnEmptyOrNoMatch() {
-        let input = ["deploy", "write docs"]
-        XCTAssertNil(RecentDescriptions.firstPrefixMatch(descriptions: input, query: ""))
-        XCTAssertNil(RecentDescriptions.firstPrefixMatch(descriptions: input, query: "xyz"))
+    func testAutocompleteMatchesMidWordSubstring() {
+        let input = ["deploy", "Create billing system", "write docs"]
+        XCTAssertEqual(RecentDescriptions.firstAutocomplete(descriptions: input, query: "bill"),
+                       "Create billing system")
     }
 
-    func testPrefixMatchNilOnExactHit() {
-        let input = ["deploy", "deployment"]
-        // "deploy" matches "deploy" exactly (nothing to complete) but "deployment"
-        // is longer, so it is offered instead.
-        XCTAssertEqual(RecentDescriptions.firstPrefixMatch(descriptions: input, query: "deploy"),
-                       "deployment")
-        XCTAssertNil(RecentDescriptions.firstPrefixMatch(descriptions: ["deploy"], query: "deploy"))
+    func testAutocompletePrefersPrefixOverSubstring() {
+        // "billing" (substring in #1) appears before "Bill Ford" (prefix), but a
+        // prefix match wins regardless of order.
+        let input = ["Create billing system", "Bill Ford"]
+        XCTAssertEqual(RecentDescriptions.firstAutocomplete(descriptions: input, query: "bill"),
+                       "Bill Ford")
+    }
+
+    func testAutocompleteNilOnEmptyOrNoMatch() {
+        let input = ["deploy", "write docs"]
+        XCTAssertNil(RecentDescriptions.firstAutocomplete(descriptions: input, query: ""))
+        XCTAssertNil(RecentDescriptions.firstAutocomplete(descriptions: input, query: "xyz"))
+    }
+
+    func testAutocompleteNilOnExactHit() {
+        XCTAssertNil(RecentDescriptions.firstAutocomplete(descriptions: ["deploy"], query: "deploy"))
     }
 }
