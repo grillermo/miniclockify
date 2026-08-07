@@ -184,8 +184,12 @@ struct StopConfirmView: View {
     @Bindable var tracking: TrackingStore
     let onDone: () -> Void
 
-    @State private var stopping = false
+    /// Non-nil while a stop or discard request is in flight; blocks re-entry and
+    /// disables the other action so the two can't race.
+    @State private var busy: Action?
     @FocusState private var focused: Bool
+
+    private enum Action { case stop, discard }
 
     private var running: (desc: String, start: Date)? {
         if case .running(_, let start, let desc, _) = tracking.state { return (desc, start) }
@@ -207,7 +211,7 @@ struct StopConfirmView: View {
                 Text(err).font(.caption).foregroundStyle(.red)   // inline retry surface
             }
             Divider()
-            Text("Press ↩ to stop and log · esc to cancel")
+            Text("Press ↩ to stop and log · ⌫ to discard · esc to cancel")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(16)
@@ -215,21 +219,27 @@ struct StopConfirmView: View {
         .focusable()
         .focused($focused)
         .task { focused = true }
-        .onKeyPress(.return) { stop(); return .handled }
+        .onKeyPress(.return) { run(.stop); return .handled }
+        // Backspace deletes the running entry outright — same as the menu bar's
+        // "Discard timer".
+        .onKeyPress(.delete) { run(.discard); return .handled }
         .onKeyPress(.escape) {
-            guard !stopping else { return .handled }
+            guard busy == nil else { return .handled }
             onDone(); return .handled
         }
     }
 
-    private func stop() {
-        guard !stopping else { return }
-        stopping = true
+    private func run(_ action: Action) {
+        guard busy == nil else { return }
+        busy = action
         Task {
-            await tracking.stop()
-            stopping = false
-            // Only dismiss on success; on failure `stop` stays .running and sets
-            // lastError, rendered inline above so the user can retry with Enter.
+            switch action {
+            case .stop: await tracking.stop()
+            case .discard: await tracking.discard()
+            }
+            busy = nil
+            // Only dismiss on success; on failure the store stays .running and
+            // sets lastError, rendered inline above so the user can retry.
             if tracking.lastError == nil { onDone() }
         }
     }
