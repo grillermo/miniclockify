@@ -211,7 +211,7 @@ struct StopConfirmView: View {
                 Text(err).font(.caption).foregroundStyle(.red)   // inline retry surface
             }
             Divider()
-            Text("Press ↩ to stop and log · ⌫ to discard · esc to cancel")
+            Text("Press ↩ to stop and log · ⌘⌫ to discard · esc to cancel")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(16)
@@ -220,9 +220,17 @@ struct StopConfirmView: View {
         .focused($focused)
         .task { focused = true }
         .onKeyPress(.return) { run(.stop); return .handled }
-        // Backspace deletes the running entry outright — same as the menu bar's
-        // "Discard timer".
-        .onKeyPress(.delete) { run(.discard); return .handled }
+        // ⌘⌫ deletes the running entry outright — same as the menu bar's
+        // "Discard timer". Matched through the general handler because
+        // `.onKeyPress(.delete)` only fires for an unmodified press, and the
+        // backspace key arrives as U+0008 or U+007F depending on the source.
+        .onKeyPress(phases: .down) { press in
+            guard press.modifiers.contains(.command),
+                  press.key.character == "\u{7F}" || press.key.character == "\u{8}"
+            else { return .ignored }
+            run(.discard)
+            return .handled
+        }
         .onKeyPress(.escape) {
             guard busy == nil else { return .handled }
             onDone(); return .handled
