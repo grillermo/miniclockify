@@ -23,9 +23,31 @@ final class QuickEntryPanel {
     /// Hotkey-while-running confirmation: same floating panel, Enter stops & logs.
     func showStopConfirm() {
         if panel != nil { close(); return }
+        // The description can be arbitrarily long, so the panel is made tall enough
+        // for the wrapped text instead of clipping it at a fixed height.
+        //
+        // We measure the height up front and keep the window size ours alone —
+        // `sizingOptions = []` stops the hosting view publishing SwiftUI's sizes to
+        // the window. Both ways of letting it size the window failed: the minimum
+        // content size it derives from a wrapping Text stretched the panel far past
+        // the screen, and `.preferredContentSize` resizing this fixed-size panel
+        // threw an uncaught exception in AppKit's layout pass on open.
         let view = StopConfirmView(
             tracking: tracking, onDone: { [weak self] in self?.close() })
-        present(NSHostingController(rootView: view), height: 120)
+        let hosting = NSHostingController(rootView: view)
+        hosting.sizingOptions = []
+        var description = ""
+        if case .running(_, _, let d, _) = tracking.state { description = d }
+        present(hosting,
+                height: StopConfirmMetrics.panelHeight(
+                    description: description, width: Self.width, maxHeight: Self.maxHeight))
+    }
+
+    private static let width: CGFloat = 460
+
+    /// Never taller than most of the screen, however long the description is.
+    private static var maxHeight: CGFloat {
+        (NSScreen.main?.visibleFrame.height ?? 900) * 0.8
     }
 
     private func present(_ hosting: NSViewController, height: CGFloat) {
@@ -36,7 +58,7 @@ final class QuickEntryPanel {
         p.isFloatingPanel = true
         p.level = .floating
         p.hidesOnDeactivate = false
-        p.setContentSize(NSSize(width: 460, height: height))
+        p.setContentSize(NSSize(width: Self.width, height: height))
         p.center()
         panel = p
         NSApp.activate(ignoringOtherApps: true)
@@ -180,6 +202,49 @@ struct QuickEntryView: View {
 /// Confirmation shown when the hotkey is pressed while a timer runs. Enter stops
 /// & logs the entry; Escape cancels and leaves it running. Reuses the floating
 /// QuickEntryPanel window (see QuickEntryPanel.showStopConfirm).
+/// Key-chord matching for StopConfirmView, pulled out as a pure function because
+/// SwiftUI's `onKeyPress` closures can't be driven from `swift test` — this way the
+/// matching rule is unit tested even though the wiring still needs a live run.
+/// Panel sizing for StopConfirmView, pulled out as pure functions for the same
+/// reason as StopConfirmKeys: the math is unit tested even though only a live run
+/// exercises the real NSPanel.
+enum StopConfirmMetrics {
+    /// Shown in place of an empty description.
+    static let placeholder = "(No description)"
+
+    /// Horizontal inset of the description text — the view's 16pt padding, both sides.
+    static let horizontalPadding: CGFloat = 16
+
+    /// Height of everything except the description: elapsed readout, divider, hint
+    /// row, VStack spacing and vertical padding. Calibrated against the fixed 120pt
+    /// panel this replaced, which fit exactly one line of description.
+    static let chromeHeight: CGFloat = 100
+
+    /// Height the panel needs to show `description` in full, capped at `maxHeight`.
+    static func panelHeight(
+        description: String, width: CGFloat, maxHeight: CGFloat,
+        font: NSFont = .preferredFont(forTextStyle: .title3)
+    ) -> CGFloat {
+        let text = description.isEmpty ? placeholder : description
+        let available = max(1, width - horizontalPadding * 2)
+        let bounds = (text as NSString).boundingRect(
+            with: NSSize(width: available, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font])
+        return min(chromeHeight + ceil(bounds.height), maxHeight)
+    }
+}
+
+enum StopConfirmKeys {
+    /// ⌘⌫ — discard the running entry. The backspace key reaches SwiftUI as
+    /// U+007F (delete) or U+0008 (backspace) depending on the event source, so
+    /// both are accepted. Other modifiers alongside ⌘ are tolerated.
+    static func isDiscardChord(character: Character, modifiers: EventModifiers) -> Bool {
+        guard modifiers.contains(.command) else { return false }
+        return character == "\u{7F}" || character == "\u{8}"
+    }
+}
+
 struct StopConfirmView: View {
     @Bindable var tracking: TrackingStore
     let onDone: () -> Void
@@ -199,7 +264,12 @@ struct StopConfirmView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let r = running {
-                Text(r.desc.isEmpty ? "(No description)" : r.desc).font(.title3)
+                // Wraps over as many lines as it needs — the panel is sized to
+                // fit (QuickEntryPanel.showStopConfirm), so nothing gets clipped.
+                Text(r.desc.isEmpty ? StopConfirmMetrics.placeholder : r.desc)
+                    .font(.title3)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 // TimelineView keeps the elapsed readout live while the panel is open.
                 TimelineView(.periodic(from: .now, by: 1)) { _ in
                     Text(elapsed(since: r.start))
@@ -225,8 +295,8 @@ struct StopConfirmView: View {
         // `.onKeyPress(.delete)` only fires for an unmodified press, and the
         // backspace key arrives as U+0008 or U+007F depending on the source.
         .onKeyPress(phases: .down) { press in
-            guard press.modifiers.contains(.command),
-                  press.key.character == "\u{7F}" || press.key.character == "\u{8}"
+            guard StopConfirmKeys.isDiscardChord(
+                character: press.key.character, modifiers: press.modifiers)
             else { return .ignored }
             run(.discard)
             return .handled
